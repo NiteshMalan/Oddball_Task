@@ -1,0 +1,821 @@
+tic;
+% function to read files from EDEN patients and combine in one strudcture
+% for avg or plotting
+% close all
+clear all
+clc
+% Define subjects list
+% subj_list={'003','004','005','007','008','011','013','014','015'}; % prep/go
+subj_list={'007','008','011','013','014','015'}; % prepballistic/goballistic
+subj_list={'008','011','013','014','015'}; % prepballistic/goballistic
+subj_list={'007'};
+base_dir='E:\Oddball Data\';
+task='ODD'; % 'BLK' 'GO' 'GOBALLISTIC' 'PREP' 'PREPBALLISTIC'
+timelock='onset'; % go, onset, offset, prep
+aff_cond=[1 101];naff_cond=[10 110];
+cond=aff_cond;
+stage={'implant'}; % implant or explant
+
+%
+for sb=1: numel(subj_list)
+    for st=1:numel(stage)
+        data_dir=[base_dir 'EDEN' subj_list{sb} filesep '\ANALYSIS' filesep];
+        cd(data_dir);
+        data_file=['data_eogclean_ALL' stage{st} '_' task '_timelock_to_go_DYNOnOffset.mat'];
+        
+        if isfile(data_file)
+            load(data_file);            
+            
+
+            %% convert data_eogclean to data_scd
+            
+            data_scd = Griptask_RT_compute_scd(data_eogclean);
+            %data_scd = Griptask_RT_compute_cma(data_eogclean);
+            % data_scd=data_eogclean;
+            clear data_eogclean
+            %% redefine if needed
+            if strcmp(task,'BLK') || strcmp(task,'SIN2') || strcmp(task,'SIN4')
+                data_scd_redef=data_scd;
+            else % redefine if needed
+                data_scd_redef=P1_data_redefine([],data_scd,timelock,3,6);
+            end
+           clear data_scd
+            %% Preprocess
+            data_preproc=P1_data_preprocess(data_scd_redef,subj_list{sb});
+            data_preproc=standadize_eeg(data_preproc);
+            %% Artifact removal
+            % data_clean{sb}=data_artifact_reject(data_preproc, actual_TOI);
+            data_clean{sb,st}=data_preproc;
+            data_clean{sb,st}.subj=subj_list{sb};
+            clear data_preproc
+
+
+            %% swap eeg , emg, dyn electrodes
+            % make left hand affected for all subjects and right hand
+            % non-affected
+            [cond1,hand1]=EDEN_motor_extremity_lookup(subj_list{sb},'Affected',task);
+            [cond2,hand2]=EDEN_motor_extremity_lookup(subj_list{sb},'NonAffected',task);
+            data_clean{sb,st}=P1_swap_eeg_labels(data_clean{sb,st},cond1,cond2,subj_list{sb});
+            x = data_clean{sb,st}
+                       
+                        
+            % with 10 components and 300Hz it takes about 55 seconds on my computer
+            % with 20 components and 300Hz it takes about 165 seconds
+            % with 30 components and 300Hz it takes about xxx seconds
+            
+            cfg          = [];
+            cfg.method   = 'summary';
+            cfg.channel = 'C4';
+            % cfg.ylim     = [-1e-12 1e-12];
+            dummy        = ft_rejectvisual(cfg, x); % using the data without atypical artifacts
+
+
+
+
+            %data_clean_fname = ['data_clean' stage{st} '_naff_cond'];
+            %save(data_clean_fname,"x")
+            
+%              % compute time-freq
+%              impl_trials=numel(find(data_clean{sb,st}.trialinfo(:,1)==cond(2))); % make st=1 to match implant trial number
+%              data_Nfreq_aff_odd{sb,st}=P1_data_time_freq_proc(data_clean{sb,st},cond(2),[]);
+%              data_Nfreq_aff_typ{sb,st}=P1_data_time_freq_proc(data_clean{sb,st},cond(1),[],impl_trials);
+% %              impl_trials=numel(find(data_clean{sb,1}.trialinfo(:,1)==naff_cond));
+% %               data_Nfreq_naff{sb,st}=P1_data_time_freq_proc(data_clean{sb,st},naff_cond,[],impl_trials);
+        else
+            warning('File does not exist');
+        end
+    end
+end
+toc;
+%% plotting the ERD/ERS of DBS contacts
+
+tic;
+close all
+
+cfgplot.frequency={[8 12], [13 20], [21 30] [31 45]};
+
+offs = [5 2.5 2.5 2.5 5 5 2.5 5 5 5];
+clear avg_data ch_data
+%figure('Name',['[' num2str(cfgplot.frequency(1)) '-' num2str(cfgplot.frequency(2)) ']'],'NumberTitle','off');
+figure;
+st=2;
+for sb=1:numel(subj_list)    %% plotting
+
+    scale=500; scaledyn=10;
+    if strcmp(subj_list{sb},'015')
+        EEG_ch_vec={'C4' 'CP2' 'P4'};  DBSch='DBS6-7'; time_vec={[-4 -2] [-2 2] [2 4] [4 6]}; EMGch='EmgL'; scale=60; scaledyn=3;
+    elseif strcmp(subj_list{sb},'014')
+        EEG_ch_vec={'F4', 'FC2' 'FC6'}; DBSch='DBS5-6'; time_vec={[-4 -2] [-2 2] [2 4] [4 6]}; EMGch='EmgL'; scale=110;
+    elseif strcmp(subj_list{sb},'013')
+        EEG_ch_vec={'FC2' 'C4' 'CP2'}; DBSch='DBS4-5'; time_vec={[-4 -2] [-2 2] [2 4] [4 6]}; EMGch='EmgL';
+    elseif strcmp(subj_list{sb},'011')
+        EEG_ch_vec={'FC2' 'C4' 'F4'}; DBSch='DBS5-6';time_vec={[-2 -1] [-1 1] [1 2] [2 3]}; EMGch='EmgL';
+    elseif strcmp(subj_list{sb},'008')
+        EEG_ch_vec={'FC2' 'CP6' 'F4'}; DBSch='DBS1-234';time_vec={[-4 -2] [-2 2] [2 4] [4 6]}; EMGch='EmgL';
+    elseif strcmp(subj_list{sb},'007')
+        EEG_ch_vec={'CP2' 'P4' 'C4'}; DBSch='DBS567-8';time_vec={[-2 -1] [-1 1] [1 2] [2 3]}; EMGch='EmgL'; scale=1000000;
+
+    end
+
+    % [cond,hand]=EDEN_motor_extremity_lookup(subj_list{sb},'Affected',task);
+    hand='Left';
+    for cd=1:2
+        if cd==1
+            data_Nfreq=data_Nfreq_aff_typ{sb,st}; colr='k';
+        else
+            data_Nfreq=data_Nfreq_aff_odd{sb,st}; colr='r';
+        end
+       % if (sb==3), offset = [0.1 0.20 0.3 0.4 0]; elseif (sb==4), offset = [0.15 0.30 0.45 0.60 0]; else, offset = [0.2 0.30 0.4 0.5 0]; end
+       offset = [0.3 0.6 0.8 0.9 0.05 0];
+        if ~isempty(data_Nfreq)
+            for fr=1:3 % 3 bands
+                dbs_cum_data=[];  eeg_cum_data=[];
+                freqindx=logical(data_Nfreq.freq>=cfgplot.frequency{fr}(1) & data_Nfreq.freq<cfgplot.frequency{fr}(2));
+                subplot(1,6,sb)
+
+                % Read DBS
+
+                DBSindx=find( ~cellfun( @(c)isempty(strfind(c,DBSch)),data_Nfreq.label));
+                for jk = DBSindx(1):DBSindx(end)
+                    cfgplot.channel        = jk;
+                    %cfgplot.trials = find(data_Nfreq.trialinfo==11);
+                    data_to_plot=squeeze(mean(data_Nfreq.powspctrm(jk,freqindx,:),2)) - (mean(mean(data_Nfreq.powspctrm(jk,freqindx,1:200),2),3));
+                    %  plot(data_Nfreq.time, data_to_plot+offset(fr),'LineWidth',1.5);
+                    % hold on
+                    %title(['DBS-' num2str(find(DBSindx==jk))]);sa
+                    dbs_cum_data=[dbs_cum_data data_to_plot];
+                    %line([2 2],ylim,'Color','k','LineStyle','--');
+                    %xlim(cfgplot.xlim); %ylim(cfgplot.ylim);
+                end
+
+                dbs_data_avg{fr,sb}=smoothdata(median(dbs_cum_data,2),'movmean',2);
+                dbs_ch_data{fr,sb}=dbs_cum_data;
+
+                plot(data_Nfreq.time, dbs_data_avg{fr,sb}+offset(fr),colr,'LineWidth',3,'LineStyle','-');
+                title([subj_list{sb} '  (n= ' num2str(numel(find(data_clean{sb}.trialinfo(:,1)==cond))) ')']);
+                hold on;
+                % Read EEG
+
+%                % if strcmp(hand,'Right')
+%                     EEG_ch=ft_channelselection({'CP2'}, data_clean{sb,st}.label, 'eeg1010');
+%                     EEGindx=find(ismember(data_clean{sb,st}.label,EEG_ch));
+%                % else
+%                %     EEG_ch=ft_channelselection({'CP2', 'C4', 'FC2'}, data_clean{sb}.label, 'eeg1010');
+%                %     EEGindx=find(ismember(data_clean{sb}.label,EEG_ch));
+%                % end
+%                 for ep=1: length(EEGindx)
+%                     data_to_plot=squeeze(mean(data_Nfreq.powspctrm(EEGindx(ep),freqindx,:),2)) - (mean(mean(data_Nfreq.powspctrm(EEGindx(ep),freqindx,1:200),2),3));
+%                     %plot(data_Nfreq{sb}.time, data_to_plot+offset(fr)); hold on
+%                     %title(['DBS-' num2str(find(DBSindx==jk))]);sa
+%                     eeg_cum_data=[eeg_cum_data data_to_plot];
+%                 end
+% 
+%                 eeg_data_avg{fr,sb}=smoothdata(median(eeg_cum_data,2),'movmean',3);
+%                 eeg_ch_data{fr,sb}=eeg_cum_data;
+% 
+%                 plot(data_Nfreq.time, eeg_data_avg{fr,sb}+offset(fr),colr,'LineWidth',2,'LineStyle','-');
+%                 title([subj_list{sb} '  Trials: ' num2str(numel(find(data_clean{sb,st}.trialinfo(:,1)==cond)))]);
+%                 hold on;
+            end
+        end
+
+        % compute mean of emg and plot
+        EMGindx=find( ~cellfun( @(c)isempty(strfind(c,['Emg' hand(1)])),data_clean{sb,st}.label));
+        DYNindx=find( ~cellfun( @(c)isempty(strfind(c,['Dyn' hand(1) '(lc)'])),data_clean{sb,st}.label));
+         if strcmp(subj_list(sb),'013'), EMGindx =EMGindx(1); end
+         if strcmp(subj_list(sb),'011'), EMGindx =EMGindx(1); end
+         if strcmp(subj_list(sb),'007'), EMGindx =EMGindx(1); end
+         if numel(EMGindx)>1
+             EMGindx=find( ~cellfun( @(c)isempty(strmatch(c,['Emg' hand(1)],'exact')),data_Nfreq.label));
+         end
+
+         cfgemg = [];
+        cfgemg.removemean         = 'yes';
+        cfgemg.channel=EMGindx;
+        cfgemg.trials = find(data_clean{sb,st}.trialinfo(:,1)==cond(cd)); %1 leftblk
+        %  data_env=emg_envelope(data_clean{sb},400);
+        emg_data_avg = ft_timelockanalysis(cfgemg, data_clean{sb,st});
+
+        hold on;
+        plot(emg_data_avg.time,(smoothdata(emg_data_avg.avg,'movmean',100)/scale)+offset(fr+1),colr);
+
+        
+        cfgdyn = [];
+        cfgdyn.removemean         = 'yes';
+        cfgdyn.channel=DYNindx;
+        cfgdyn.trials = find(data_clean{sb,st}.trialinfo(:,1)==cond(cd)); %1 leftblk
+        %  data_env=emg_envelope(data_clean{sb},400);
+        dyn_data_avg = ft_timelockanalysis(cfgdyn, data_clean{sb,st});
+
+        hold on;
+        plot(dyn_data_avg.time,(smoothdata(dyn_data_avg.avg,'movmean',10)/scaledyn)+offset(fr+2),colr);
+        
+        
+        yticks([-0.1:0.05:0.1]); ylim([-0.1 0.1])
+        %   if (sb==5), ylim([-0.1 0.3]); end
+        xlabel('Time (s)');
+        % ylabel('Relative change in power');
+        axis tight
+        line([0 0],ylim,'Color','k','LineStyle','--','LineWidth',1.5);
+        %line([offs(sb) offs(sb)],ylim,'Color','k','LineStyle','--','LineWidth',1.5);
+        set(gca,'YTickLabel',[]);
+        set(gca,'FontSize',15); set(gca,'LineWidth',1.5);
+    end
+
+end
+%suplabel(['[' num2str(cfgplot.frequency(1)) '-' num2str(cfgplot.frequency(2)) ']'],'t')
+%maximize;
+toc;
+
+%%  CCC avg all dbs
+% avg all dbs contacts, then compute coh between avg DBS and EEG, then avg
+% the coherences
+
+method='coh';
+cfgfd                  = [];
+eval(['cfgfd.parameter        = ''' method 'spctrm'';']);
+cfgfd.xlim             = [5 45];
+cfgfd.layout           = 'eeg1010';%['EDEN_eeg_layout_for_plots.mat']; %'eeg1010';%
+cfgfd.showlabels       = 'yes';
+cfgfd.linestyle     = {'-','-','-','-','-','-','-','--','--','--','--','--'};
+cfgfd.graphcolor='brgkymcrgbkymcrgbkywrgbkyw';
+
+for sb=1: numel(subj_list)
+    DBSch='DBS';
+        EEG_ch_vec={'C4' 'FC2' 'CP2'};
+        
+    for st=1:2
+        if (st==1)
+            cmc_time_int=[-2 0];
+        else
+            cmc_time_int=[-2 0];
+        end
+        cond=1; hand='Left'; method='coh';
+        impl_trials=numel(find(data_clean{sb,1}.trialinfo(:,1)==aff_cond));
+        % match impl and expl number of trials
+        
+        
+        [ccc_aff]=P1_data_ccc_fulleeg_proc(data_clean{sb,st},cmc_time_int,cond,method,[],'EmgL');
+        
+        DBSindx=find( ~cellfun( @(c)isempty(strfind(c,DBSch)),ccc_aff.label));
+        eegindx=find(ismember(ccc_aff.label,EEG_ch_vec));%find(~ismember(1:numel(ccc_aff.label),DBSindx));
+        ind=1; col={'b' 'r' 'g'}; avg_of_avg=[];
+        freq_indx=logical(ccc_aff.freq>cfgfd.xlim(1) & ccc_aff.freq<=cfgfd.xlim(2));
+        for jk=1:numel(eegindx)
+            avg_ccc=zeros(size(ccc_aff.cohspctrm,3),1);
+            for mn=1: numel(DBSindx)
+                comb1=smoothdata(squeeze(ccc_aff.cohspctrm(eegindx(jk),DBSindx(mn),:)),'gaussian',5); % eeg to DBS
+                %                 figure(10)
+                %                 subplot(numel(eegindx)+2,numel(DBSindx),ind);
+                %                 plot(ccc_aff.freq,comb1,'Color','k','LineWidth',2);
+                %                 xlim([5 45]); ylim([0 max(comb1)+1]);
+                %                 thresh=ccc_aff_surr_thresh(eegindx(jk),DBSindx(mn));
+                %                 line(xlim(), [thresh, thresh], 'LineWidth', 1, 'LineStyle','--','Color', 'k');
+                %                 if (jk==1), title(ccc_aff.label{DBSindx(mn)}); end
+                %                 if (jk==1 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+                %                 if (jk==2 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+                %                 if (jk==3 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+                %                 if (jk==4 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+                ind=ind+1;
+                avg_ccc=avg_ccc+comb1;
+            end
+            avg_ccc=avg_ccc/numel(DBSindx);
+            figure(100);
+            subplot(3,3,sb);
+%             plot(ccc_aff.freq,avg_ccc,col{jk}); xlim([5 45]); ylim([0 25]);
+%             set(gca,'FontSize',16);hold on;
+            avg_of_avg(:,jk)=avg_ccc;
+            avg_of_avg_dummy=avg_of_avg; avg_of_avg_dummy(~freq_indx,:)=0;
+            
+            
+        end
+        if (st==1), color='b'; else, color='r'; end
+        plot(ccc_aff.freq,mean(avg_of_avg,2),color,'LineWidth',2); xlim([5 45]); ylim([0 10]); hold on;
+        [max_coh,max_freq]=max(mean(avg_of_avg_dummy,2));
+        
+        text(ccc_aff.freq(max_freq),max_coh+1,num2str(ccc_aff.freq(max_freq)),'fontsize',11,'Color',color)
+    end
+    hold off;
+    legend(task);
+end
+
+%%  CCC single leads 2D
+close all;
+
+method='coh';
+cfgfd                  = [];
+eval(['cfgfd.parameter        = ''' method 'spctrm'';']);
+cfgfd.xlim             = [5 45];
+cfgfd.layout           = 'eeg1010';%['EDEN_eeg_layout_for_plots.mat']; %'eeg1010';%
+cfgfd.showlabels       = 'yes';
+cfgfd.linestyle     = {'-','-','-','-','-','-','-','--','--','--','--','--'};
+cfgfd.graphcolor='brgkymcrgbkymcrgbkywrgbkyw';
+stats_opt=true;
+freqlim=cfgfd.xlim;
+
+for sb=1%: numel(subj_list)
+    if strcmp(subj_list{sb},'007')
+        DBSch='DBS234-567'; EEG_ch_vec='C4'; forcech=42;
+    elseif strcmp(subj_list{sb},'008')
+        DBSch='DBS567-8';  EEG_ch_vec='C4'; forcech=40;
+    elseif strcmp(subj_list{sb},'011')
+        DBSch='DBS7-8'; EEG_ch_vec='FC2'; forcech=44;
+    elseif strcmp(subj_list{sb},'013')
+        DBSch='DBS7-8';
+    elseif strcmp(subj_list{sb},'014')
+        DBSch='DBS4-5';
+    elseif strcmp(subj_list{sb},'015')
+        DBSch='DBS3-4';
+    end
+
+    for st=1%:2
+        if (st==1)
+            cmc_time_int=[-1 1];
+        else
+            cmc_time_int=[-1 1];
+        end
+        if (st==1), color='b'; else, color='r'; end
+        hand='Left'; method='coh'; aff_cond=101;
+        impl_trials=numel(find(data_clean{sb,1}.trialinfo(:,1)==aff_cond));
+        % match impl and expl number of trials
+
+
+        [ccc_aff1]=P1_data_ccc_fulleeg_proc(data_clean{sb,st},cmc_time_int,1,method,impl_trials,'EmgL');
+        [ccc_aff101]=P1_data_ccc_fulleeg_proc(data_clean{sb,st},cmc_time_int,101,method,impl_trials,'EmgL');
+
+        %         DBSindx=find( ~cellfun( @(c)isempty(strfind(c,DBSch)),ccc_aff.label));
+        %         eegindx=find(ismember(ccc_aff.label,EEG_ch_vec));%find(~ismember(1:numel(ccc_aff.label),DBSindx));
+        %         ind=1; col={'b' 'r' 'g'}; avg_of_avg=[];
+        %         freq_indx=logical(ccc_aff.freq>cfgfd.xlim(1) & ccc_aff.freq<=cfgfd.xlim(2));
+        %         for jk=1:numel(eegindx)
+        %             avg_ccc=zeros(size(ccc_aff.cohspctrm,3),1);
+        %             for mn=1: numel(DBSindx)
+        %                 comb1=smoothdata(squeeze(ccc_aff.cohspctrm(eegindx(jk),DBSindx(mn),:)),'gaussian',5); % eeg to DBS
+        %                                 figure(1)
+        %                                 subplot(numel(eegindx)+2,numel(DBSindx),ind);
+        %                                 plot(ccc_aff.freq,comb1,'Color',color,'LineWidth',2); hold on;
+        %                                 xlim([5 45]); ylim([0 15]);
+        % %                                 thresh=ccc_aff_surr_thresh(eegindx(jk),DBSindx(mn));
+        % %                                 line(xlim(), [thresh, thresh], 'LineWidth', 1, 'LineStyle','--','Color', 'k');
+        %                                 if (jk==1), title(ccc_aff.label{DBSindx(mn)}); end
+        %                                 if (jk==1 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+        %                                 if (jk==2 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+        %                                 if (jk==3 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+        %                                 if (jk==4 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+        %                 ind=ind+1;
+        %                 avg_ccc=avg_ccc+comb1;
+        %             end
+        %             avg_ccc=avg_ccc/numel(DBSindx);
+        % %             figure(100);
+        % %             subplot(3,3,sb);
+        % %             plot(ccc_aff.freq,avg_ccc,col{jk}); xlim([5 45]); ylim([0 25]);
+        % %             set(gca,'FontSize',16);hold on;
+        %             avg_of_avg(:,jk)=avg_ccc;
+        %             avg_of_avg_dummy=avg_of_avg; avg_of_avg_dummy(~freq_indx,:)=0;
+       DBSindx=find( ~cellfun( @(c)isempty(strfind(c,'DBS')),ccc_aff1.label));
+         eegindx=find(~ismember(1:numel(ccc_aff1.label),DBSindx));
+          DBSchindx=find(ismember(ccc_aff1.label,DBSch));
+        psuedo_corr1.label=ccc_aff1.label(eegindx);
+        psuedo_corr1.dimord='chan_time';
+        psuedo_corr1.time=ccc_aff1.freq;
+        psuedo_corr101=psuedo_corr1;
+        psuedo_corr1.avg=smoothdata(squeeze(ccc_aff1.cohspctrm(eegindx,DBSchindx,:)),'movmean',1);
+        psuedo_corr101.avg=smoothdata(squeeze(ccc_aff101.cohspctrm(eegindx,DBSchindx,:)),'movmean',1);
+
+        
+        cfgfd                  = [];
+        cfgfd.parameter='avg';
+        cfgfd.xlim             = [5 45];
+        cfgfd.layout           = ['EDEN_eeg_layout_for_plots.mat']; %'eeg1010';%
+        cfgfd.showlabels       = 'yes';
+        cfgfd.refchannel       = DBSch;
+        cfgfd.channel       = 'all';%{'all' ch_2_remove{:}};
+        cfgfd.showcomment = 'no';
+        cfgfd.graphcolor='br';
+        cfgfd.linewidth     = 1;
+        ft_multiplotER(cfgfd, psuedo_corr1,psuedo_corr101);
+
+    end
+    %         if (st==1), color='b'; else, color='r'; end
+    %         plot(ccc_aff.freq,mean(avg_of_avg,2),color,'LineWidth',2); xlim([5 45]); ylim([0 60]); hold on;
+    %         [max_coh,max_freq]=max(mean(avg_of_avg_dummy,2));
+    %
+    %         text(ccc_aff.freq(max_freq),max_coh+1,num2str(ccc_aff.freq(max_freq)),'fontsize',11,'Color',color)
+    hold off;
+end
+
+
+%%  CCC single leads 3D
+%close all;
+method='coh';
+toi=-1:0.01:4;
+foi=1:45; ccc_aff=[];
+for sb=1%: numel(subj_list)
+    if strcmp(subj_list{sb},'007')
+        DBSch='DBS234-567'; EEG_ch_vec='C4'; forcech=42;
+    elseif strcmp(subj_list{sb},'008')
+        DBSch='DBS1-234';  EEG_ch_vec='C4'; forcech=40;
+    elseif strcmp(subj_list{sb},'011')
+        DBSch='DBS7-8'; EEG_ch_vec='FC2'; forcech=44;
+    elseif strcmp(subj_list{sb},'013')
+        DBSch='DBS7-8'; forcech=43;
+    elseif strcmp(subj_list{sb},'014')
+        DBSch='DBS4-5'; forcech=45;
+    elseif strcmp(subj_list{sb},'015')
+        DBSch='DBS3-4'; forcech=45;
+    end
+    EEG_ch_vec={'C4' 'FC2' 'CP2' 'F4' 'FC6' 'CP6' 'P4'};
+     st=1;   aff_cond=101; cond=[1 101]; hand='Left';
+   % for cond=[1 101]
+ 
+        % match impl and expl number of trials
+       impl_trials=numel(find(data_clean{sb,1}.trialinfo(:,1)==aff_cond));
+        
+       % [ccc_aff]=P1_data_ccc_fulleeg_proc(data_clean{sb,st},cmc_time_int,cond,method,[]);
+       ccc_aff{1}=P2_Griptask_TFCoherence(foi,toi,cond(1),data_clean{sb,st},impl_trials,method);
+       ccc_aff{2}=P2_Griptask_TFCoherence(foi,toi,cond(2),data_clean{sb,st},impl_trials,method);
+       %%
+        sub_coh=ccc_aff{1};
+        eval(['sub_coh.cohspctrm=ccc_aff{2}.' method 'spctrm - ccc_aff{1}.' method 'spctrm;']);
+     %   for cd=1%:2
+            DBSindx=find(ismember(ccc_aff{1}.label,'DBS234-567')); %find( ~cellfun( @(c)isempty(strfind(c,'DBS234-567')),sub_coh.label));
+            eegindx=find(ismember(ccc_aff{1}.label,EEG_ch_vec));%find(~ismember(1:numel(ccc_aff.label),DBSindx));
+            ind=1; col={'b' 'r' 'g'}; avg_of_avg=[];
+           
+            force=[];
+            forcech=find( ~cellfun( @(c)isempty(strfind(c,['Dyn' hand(1) '(lc)'])),data_clean{sb,st}.label));
+            if isempty(forcech)
+                forcech=find( ~cellfun( @(c)isempty(strfind(c,['Dyn' hand(1)])),data_clean{sb,st}.label));
+            end
+            % force profile
+            trials2c=find(data_clean{sb,st}.trialinfo(:,1)==cond(1));
+            count=1;
+            for tr=trials2c'
+                force(count,:) = data_clean{sb,st}.trial{tr}(forcech,:); count=count+1;
+            end
+            avgforce1=mean(force,1);
+            avgforce1=avgforce1-mean(avgforce1(1:100));
+            % force profile
+            force=[];
+            trials2c=find(data_clean{sb,st}.trialinfo(:,1)==cond(2));
+            count=1;
+            for tr=trials2c'
+                force(count,:) = data_clean{sb,st}.trial{tr}(forcech,:); count=count+1;
+            end
+            avgforce2=mean(force,1);
+            avgforce2=avgforce2-mean(avgforce2(1:100));
+
+
+            EMGindx=find( ~cellfun( @(c)isempty(strfind(c,['Emg' hand(1)])),data_clean{sb,st}.label));
+            if strcmp(subj_list(sb),'013'), EMGindx =EMGindx(1); end
+            if strcmp(subj_list(sb),'011'), EMGindx =EMGindx(1); end
+            if strcmp(subj_list(sb),'007'), EMGindx =EMGindx(1); end
+            if numel(EMGindx)>1
+                EMGindx=find( ~cellfun( @(c)isempty(strmatch(c,['Emg' hand(1)],'exact')),data_clean{sb,st}.label));
+            end
+
+            cfgemg = [];
+            cfgemg.removemean         = 'yes';
+            cfgemg.channel=EMGindx;
+            cfgemg.trials = find(data_clean{sb,st}.trialinfo(:,1)==cond(1)); %1 leftblk
+            emg_data_avg_1 = ft_timelockanalysis(cfgemg, data_clean{sb,st});
+            emg_data_avg_1.avg=emg_data_avg_1.avg-mean(emg_data_avg_1.avg);
+            cfgemg.trials = find(data_clean{sb,st}.trialinfo(:,1)==cond(2)); %1 leftblk
+            emg_data_avg_2 = ft_timelockanalysis(cfgemg, data_clean{sb,st});
+            emg_data_avg_2.avg=emg_data_avg_2.avg-mean(emg_data_avg_2.avg);
+
+            for jk=1:numel(eegindx)
+               % avg_ccc=zeros(size(ccc_aff.cohspctrm,3),1);
+                for mn=1: numel(DBSindx)
+                    %comb1=smoothdata(squeeze(ccc_aff{cd}.cohspctrm(eegindx(jk),DBSindx(mn),:,:)),'gaussian',5); % eeg to DBS
+                    figure(cond(1))
+                    subplot(numel(eegindx)+2,numel(DBSindx),ind);
+                    cfgplot                 = [];
+                    cfgplot.method = 'coh';
+                    cfgplot.ylim = [1 20];
+                    cfgplot.xlim = [-1 4]; %[baseline(1) 8];
+                    cfgplot.interactive     = 'yes';
+                    cfgplot.showoutline     = 'yes';
+                    cfgplot.zlim            = [-2 2];
+                    cfgplot.showoutline = 'yes';
+                    cfgplot.showlabels    = 'yes';
+                    cfgplot.colormap       = 'jet';
+                    cfgplot.parameter = 'cohspctrm';
+                    cfgplot.refchannel       = sub_coh.label{DBSindx(mn)};
+                    cfgplot.channel = sub_coh.label{eegindx(jk)};
+                    cfgplot.fontsize = 2;
+                    cfgplot.figure = 'gcf';
+                    cfgplot.colorbar = 'no';
+
+                    ft_singleplotTFR(cfgplot, sub_coh);
+                    if (jk==1), title(ccc_aff{1}.label{DBSindx(mn)},'FontSize',10); end
+                    if (jk==1 && mn==1), ylabel(ccc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==2 && mn==1), ylabel(ccc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==3 && mn==1), ylabel(ccc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==4 && mn==1), ylabel(ccc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==5 && mn==1), ylabel(ccc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==6 && mn==1), ylabel(ccc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==7 && mn==1), ylabel(ccc_aff{1}.label{eegindx(jk)}); end
+                    ind=ind+1;
+                   % avg_ccc=avg_ccc+comb1;
+                end
+
+
+                %%
+            end
+            for mn=1: numel(DBSindx)
+            subplot(numel(eegindx)+2,numel(DBSindx),ind);
+            plot(data_clean{sb,st}.time{1},[avgforce1; avgforce2]); 
+            xlim(cfgplot.xlim); ind=ind+1;
+            end
+            for mn=1: numel(DBSindx)
+            subplot(numel(eegindx)+2,numel(DBSindx),ind);
+            plot(emg_data_avg_1.time,[smoothdata(emg_data_avg_1.avg,'movmean',10); smoothdata(emg_data_avg_2.avg,'movmean',10)]);
+            xlim(cfgplot.xlim); ind=ind+1;
+            end
+
+            %         if (st==1), color='b'; else, color='r'; end
+            %         plot(ccc_aff.freq,mean(avg_of_avg,2),color,'LineWidth',2); xlim([5 45]); ylim([0 60]); hold on;
+            %         [max_coh,max_freq]=max(mean(avg_of_avg_dummy,2));
+            %
+            %         text(ccc_aff.freq(max_freq),max_coh+1,num2str(ccc_aff.freq(max_freq)),'fontsize',11,'Color',color)
+       % end
+    hold off;
+    legend('standard', 'oddball');
+end
+
+%%  GC single leads 3D
+close all;
+method='granger';
+toi=-1:0.01:4;
+foi=1:45; ccc_aff=[];
+for sb=2%: numel(subj_list)
+    if strcmp(subj_list{sb},'007')
+        DBSch='DBS567-8'; EEG_ch_vec='FC2'; forcech=42;
+    elseif strcmp(subj_list{sb},'008')
+        DBSch='DBS1-234';  EEG_ch_vec='C4'; forcech=40;
+    elseif strcmp(subj_list{sb},'011')
+        DBSch='DBS7-8'; EEG_ch_vec='FC2'; forcech=44;
+    elseif strcmp(subj_list{sb},'013')
+        DBSch='DBS7-8'; forcech=43;
+    elseif strcmp(subj_list{sb},'014')
+        DBSch='DBS4-5'; forcech=45;
+    elseif strcmp(subj_list{sb},'015')
+        DBSch='DBS3-4'; forcech=45;
+    end
+    EEG_ch_vec={'C4' 'FC2' 'CP2'};
+     st=1;   aff_cond=101; cond=[1 101];
+   % for cond=[1 101]
+ 
+        % match impl and expl number of trials
+        impl_trials=numel(find(data_clean{sb,1}.trialinfo(:,1)==aff_cond));
+        
+       % [ccc_aff]=P1_data_ccc_fulleeg_proc(data_clean{sb,st},cmc_time_int,cond,method,[]);
+       [gc_aff{1}, gc_flip_aff{1}]=P1_priming_GC(foi,toi,cond(1),data_clean{sb,st},DBSch,impl_trials);
+       [gc_aff{2}, gc_flip_aff{2}]=P1_priming_GC(foi,toi,cond(2),data_clean{sb,st},DBSch,impl_trials);
+
+         %% smooth
+%         gc_aff_sm=gc_aff;
+%         gc_flip_aff_sm=gc_flip_aff;
+%         for c=[1 2]
+%             for gin=1: size(gc_aff{c}.grangerspctrm,1)
+%                 temp=squeeze(gc_aff{c}.grangerspctrm(gin,:,:,:));
+%                 gc_aff_sm{c}.grangerspctrm(gin,:,:,:)=imgaussfilt3(temp,3);
+%             end
+%         end
+%         for c=[1 2]
+%             for gin=1: size(gc_flip_aff{c}.grangerspctrm,1)
+%                 temp=squeeze(gc_flip_aff{c}.grangerspctrm(gin,:,:,:));
+%                 gc_flip_aff_sm{c}.grangerspctrm(gin,:,:,:)=imgaussfilt3(temp, 3);
+%             end
+%         end
+       %
+        sub_coh=gc_aff{1};sub_coh2=gc_flip_aff{1};
+        eval(['sub_coh.cohspctrm=gc_aff{2}.' method 'spctrm - gc_aff{1}.' method 'spctrm;']);
+        eval(['sub_coh2.cohspctrm=gc_flip_aff{2}.' method 'spctrm - gc_flip_aff{1}.' method 'spctrm;']);
+
+        %   for cd=1%:2
+            DBSindx=find(ismember(gc_aff{1}.label,DBSch));%find( ~cellfun( @(c)isempty(strfind(c,DBSch)),gc_aff.label));
+            eegindx=find(ismember(gc_aff{1}.label,EEG_ch_vec));%find(~ismember(1:numel(gc_aff.label),DBSindx));
+            ind=1; col={'b' 'r' 'g'}; avg_of_avg=[];
+            force=[];
+            % force profile
+            trials2c=find(data_clean{sb,1}.trialinfo(:,1)==cond(1));
+            count=1;
+            for tr=trials2c'
+                force(count,:) = data_clean{sb,st}.trial{tr}(forcech,:); count=count+1;
+            end
+            avgforce1=mean(force,1);
+            % force profile
+            force=[];
+            trials2c=find(data_clean{sb,1}.trialinfo(:,1)==cond(2));
+            count=1;
+            for tr=trials2c'
+                force(count,:) = data_clean{sb,st}.trial{tr}(forcech,:); count=count+1;
+            end
+            avgforce2=mean(force,1);
+            impl_trials=numel(find(data_clean{sb,1}.trialinfo(:,1)==aff_cond));
+            for jk=1:numel(eegindx)
+               % avg_ccc=zeros(size(gc_aff.cohspctrm,3),1);
+                for mn=1: numel(DBSindx)
+                    %comb1=smoothdata(squeeze(gc_aff{cd}.cohspctrm(eegindx(jk),DBSindx(mn),:,:)),'gaussian',5); % eeg to DBS
+                    figure(2);
+                    subplot(numel(eegindx)+2,numel(DBSindx),ind);
+                    cfgplot                 = [];
+                   % cfgplot.method = 'coh';
+                    cfgplot.ylim = [1 45];
+                    cfgplot.xlim = [-1 3]; %[baseline(1) 8];
+                    cfgplot.interactive     = 'yes';
+                    cfgplot.showoutline     = 'yes';
+                    cfgplot.zlim            = [0 0.1];
+                    cfgplot.showoutline = 'yes';
+                    cfgplot.showlabels    = 'yes';
+                    cfgplot.colormap       = 'jet';
+                    cfgplot.parameter = 'cohspctrm';
+                    cfgplot.refchannel       = sub_coh.label{DBSindx(mn)};
+                    cfgplot.channel = sub_coh.label{eegindx(jk)};
+                    cfgplot.fontsize = 2;
+                    cfgplot.figure = 'gcf';
+                    cfgplot.colorbar = 'no';
+
+                    ft_singleplotTFR(cfgplot, sub_coh2);
+                    if (jk==1), title(gc_aff{1}.label{DBSindx(mn)},'FontSize',10); end
+                    if (jk==1 && mn==1), ylabel(gc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==2 && mn==1), ylabel(gc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==3 && mn==1), ylabel(gc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==4 && mn==1), ylabel(gc_aff{1}.label{eegindx(jk)}); end
+                    if (jk==5 && mn==1), ylabel(gc_aff{1}.label{eegindx(jk)}); end
+
+                    ind=ind+1;
+                   % avg_ccc=avg_ccc+comb1;
+                end
+
+
+                %%
+            end
+            subplot(numel(eegindx)+2,numel(DBSindx),ind);
+            plot(data_clean{sb,st}.time{1},[avgforce1; avgforce2]); 
+            xlim([toi(1) toi(end)]);
+            %         if (st==1), color='b'; else, color='r'; end
+            %         plot(gc_aff.freq,mean(avg_of_avg,2),color,'LineWidth',2); xlim([5 45]); ylim([0 60]); hold on;
+            %         [max_coh,max_freq]=max(mean(avg_of_avg_dummy,2));
+            %
+            %         text(gc_aff.freq(max_freq),max_coh+1,num2str(gc_aff.freq(max_freq)),'fontsize',11,'Color',color)
+       % end
+    hold off;
+    legend('standard', 'oddball');
+end
+
+%%  CCC single leads 3D
+close all;
+
+toi=-2:0.01:5;
+method='coh';
+% foi=1:45;
+freq_vec={[8:12], [13:20], [21:30], [31:45]};
+for sb=3%: numel(subj_list)
+    %   DBSch='DBS';
+    if strcmp(subj_list{sb},'007')
+        DBSch='DBS234-567'; EEG_ch_vec='C4'; forcech=42;
+    elseif strcmp(subj_list{sb},'008')
+        DBSch='DBS1-234';  EEG_ch_vec='C4'; forcech=40;
+    elseif strcmp(subj_list{sb},'011')
+        DBSch='DBS3-4'; EEG_ch_vec='FC2'; forcech=44;
+    elseif strcmp(subj_list{sb},'013')
+
+    elseif strcmp(subj_list{sb},'014')
+
+    elseif strcmp(subj_list{sb},'015')
+
+    end
+    %{'C4' 'FC2' 'CP2' 'P4' 'F4'};
+    st=1;   aff_cond=101;
+    for cond=[1 101]
+        force=[];
+        % force profile
+        trials2c=find(data_clean{sb,1}.trialinfo(:,1)==cond);
+        count=1;
+        for tr=trials2c'
+            force(count,:) = data_clean{sb,st}.trial{tr}(forcech,:); count=count+1;
+        end
+        avgforce=mean(force,1);
+        if (cond==1), color='b'; else, color='r'; end
+        %cond=1; hand='Left'; method='coh';
+        impl_trials=numel(find(data_clean{sb,1}.trialinfo(:,1)==aff_cond));
+        % match impl and expl number of trials
+
+
+        foi=1:45;
+        % [ccc_aff]=P1_data_ccc_fulleeg_proc(data_clean{sb,st},cmc_time_int,cond,method,[]);
+        ccc_aff=P2_Griptask_TFCoherence(foi,toi,cond,data_clean{sb,st},impl_trials,method);
+        %%
+        DBSindx=find(ismember(ccc_aff.label,DBSch));%find( ~cellfun( @(c)isempty(strfind(c,DBSch)),ccc_aff.label));
+        eegindx=find(ismember(ccc_aff.label,EEG_ch_vec));%find(~ismember(1:numel(ccc_aff.label),DBSindx));
+        ind=1; col={'b' 'r' 'g' 'k'}; avg_of_avg=[];
+        for fq=1:4
+            for jk=1:numel(eegindx)
+                avg_ccc=zeros(1,numel(ccc_aff.time));
+                for mn=1: numel(DBSindx)
+                    eval(['comb1=squeeze(ccc_aff.' method 'spctrm(eegindx(jk),DBSindx(mn),:,:));']); % eeg to DBS
+
+
+
+
+                    %                                 subplot(numel(eegindx)+2,numel(DBSindx),ind);
+                    %                               cfgplot                 = [];
+                    %                               cfgplot.method = 'coh';
+                    %                               cfgplot.ylim = [1 45];
+                    %                               cfgplot.xlim = [-2 5]; %[baseline(1) 8];
+                    %                               cfgplot.interactive     = 'yes';
+                    %                               cfgplot.showoutline     = 'yes';
+                    %                               cfgplot.zlim            = [0 5];
+                    %                               cfgplot.showoutline = 'yes';
+                    %                               cfgplot.showlabels    = 'yes';
+                    %                               cfgplot.colormap       = 'jet';
+                    %                               cfgplot.parameter = 'cohspctrm';
+                    %                               cfgplot.refchannel       = ccc_aff.label{DBSindx(mn)};
+                    %                               cfgplot.channel = ccc_aff.label{eegindx(jk)};
+                    %                               cfgplot.fontsize = 2;
+                    %                               cfgplot.figure = 'gcf';
+                    %                               cfgplot.colorbar = 'no';
+                    %
+                    %                               ft_singleplotTFR(cfgplot, ccc_aff);
+                    %                                 if (jk==1), title(ccc_aff.label{DBSindx(mn)}); end
+                    %                                 if (jk==1 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+                    %                                 if (jk==2 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+                    %                                 if (jk==3 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+                    %                                 if (jk==4 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+                    %                                 if (jk==5 && mn==1), ylabel(ccc_aff.label{eegindx(jk)}); end
+                    Avgcomb1=smoothdata(nanmean(comb1,1),2,'gaussian',50);
+                    ind=ind+1;
+                    avg_ccc=avg_ccc+Avgcomb1;
+                end
+
+
+
+                %%
+            end
+            if (cond==1), figure(1); else, figure(2); end
+            subplot(2,1,1)
+            plot(ccc_aff.time,Avgcomb1,color,'LineWidth',2, 'Color', col{fq}); hold on;
+            %  [max_coh,max_freq]=max(mean(avg_of_avg_dummy,2));
+
+            % text(ccc_aff.freq(max_freq),max_coh+1,num2str(ccc_aff.freq(max_freq)),'fontsize',11,'Color',color)
+        end
+        subplot(2,1,2);
+        plot(data_clean{sb,st}.time{1},avgforce); xlim([toi(1) toi(end)]);
+    end
+    hold off;
+    legend('Alpha', 'lowbeta', 'highbeta', 'gamma');
+end
+
+%%
+
+
+cond1=1;
+cond2=101;
+sb=1;
+st=1;
+fs=data_clean{sb,st}.fsample;
+foi=2:1:45; % freq of interest
+toi=-1:0.05:4;
+nPerm=100;
+doPlot=false; % generate plots inside the function
+doFdr=true; % correction for multiple comparisons
+pThr = 0.05; % Threshold of p-value after correction for multiple comparisons
+EEGsite=[];%{'C4' 'F2'}; % all
+DBSsite='DBS234-567';
+method = 'coh';
+[fdrMat, fdrMatBin, pValueArray, trueCohDiff, f, timeDs, ccc_cond1, ccc_cond2] = getCohStats_modified_alleeg(data_clean{sb,st}, EEGsite, DBSsite, cond1, cond2, fs, foi, toi, pThr, nPerm, doPlot, doFdr, method);
+%%
+ccc=[];
+DBSindx=find(ismember(ccc_cond1.label,DBSsite));
+EEGindx=find(~ismember(1:numel(ccc_cond1.label),DBSindx));
+ccc.label=ccc_cond1.label(EEGindx);
+
+ccc.dimord='chan_freq_time';
+ccc.powspctrm=trueCohDiff;
+ccc.freq=ccc_cond1.freq;
+ccc.time=ccc_cond1.time;
+ccc.mask=logical(fdrMatBin);
+
+cfgplot = [];
+cfgplot.interactive     = 'yes';
+cfgplot.showoutline     = 'yes';
+cfgplot.layout          = ['EDEN_eeg_layout_for_plots.mat'];
+cfgplot.zlim            = [0 5];
+cfgplot.showoutline = 'yes';
+cfgplot.showlabels    = 'yes';
+cfgplot.colormap       = 'jet';
+cfgplot.parameter='powspctrm';
+cfgplot.maskparameter = 'mask';       % use significance to mask the power
+cfgplot.maskalpha     = 0.1;          % make non-significant regions 30% visible
+cfgplot.maskstyle      ='outline';
+cfgplot.colormap='jet';
+cfgplot.fontsize = 20;
+cfgplot.showlabels = 'yes';
+maximize;
+ft_multiplotTFR(cfgplot, ccc);
+
+%% 
+

@@ -32,7 +32,7 @@ Normalize hemispheres (affected hand → left).
 Input: data_eogclean_ALL*.mat
 Output: data_cleanimplant.mat, data_cleanexplant.mat
 
-Step 2: Behavioral Analysis & Correlation (Figure 1)
+Step 2: Behavioral Analysis & Correlation (Figure 2)
 
 Notebook: Oddball_Behavioral_analysis_Correlation.ipynb
 
@@ -46,7 +46,7 @@ Correlate error rates and slopes across subjects (responders vs non-responders).
 Outputs: Force profiles (Fig. 1), behavioral metrics per subject
 Dependencies: Python (MNE, NumPy, SciPy, Matplotlib, Seaborn, pandas)
 
-**Step 3: ERP Plots (Figure 2)
+**Step 3: ERP Plots (Figure 3)
 **
 
 Notebook: Oddball_final_plots.ipynb
@@ -61,7 +61,7 @@ Compare responders vs non-responders.
 Output: Figure 2 (ERP curves & scalp maps)
 Dependencies: Python 3, MNE-Python, NumPy, SciPy, Matplotlib, Seaborn
 
-**Step 4: Average ERDS Plots (Figures 3 & 4)
+**Step 4: Average ERDS Plots (Figures 4 & 5)
 **
 
 Notebook: Oddball_ERDS_avg_plots.ipynb

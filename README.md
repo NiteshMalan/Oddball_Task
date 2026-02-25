@@ -18,3 +18,32 @@ Software:
 MATLAB R2020a or newer
 FieldTrip toolbox
 EEGLAB toolbox
+
+Step 2: Clean and Standardize Data
+
+Script:
+
+Matlab code/Data_clean_Save.m
+
+Purpose:
+
+Compute surface Laplacian (SCD) or optionally CMA.
+
+Redefine trials based on task events.
+
+Preprocess EEG (filtering, baseline correction) and standardize signals.
+
+Remove artifacts.
+
+Normalize hemispheres (affected hand → left).
+
+Save cleaned datasets for analysis.
+
+Input:
+Output from Step 1: data_eogclean_ALL*.mat per subject and stage.
+
+Output:
+Cleaned files per subject and stage:
+
+data_cleanimplant.mat
+data_cleanexplant.mat

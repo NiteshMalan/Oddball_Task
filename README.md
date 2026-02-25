@@ -1,5 +1,5 @@
-Motor Oddball Task EEG Analysis Pipeline
-
+**Motor Oddball Task EEG Analysis Pipeline
+**
 This repository contains the full EEG analysis pipeline for a motor oddball task, covering preprocessing, ERP extraction, time-frequency analysis, statistical modeling, and figure generation. This code accompanies the paper:
 
 Malan et al., 2025 – Neural mechanisms of motor and cognitive processing revealed using EEG and neural modeling.

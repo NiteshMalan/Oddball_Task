@@ -94,3 +94,35 @@ Figure 2 in the manuscript: ERP curves and topographic maps of Oddball vs Standa
 Dependencies:
 
 Python 3, MNE-Python, NumPy, SciPy, Matplotlib, Seaborn.
+
+Step 4: Average ERDS Plots (Figures 3 & 4)
+
+Notebook: Oddball_ERDS_avg_plots.ipynb
+
+Description:
+
+Load preprocessed EEG & DBS epochs per subject and condition.
+
+Separate trials into error (E) and no-error (NE).
+
+Compute TFRs (1–30 Hz) using Morlet wavelets, crop -1.5 to 4 s.
+
+Apply baseline normalization (percent change or standard baseline).
+
+Average TFRs across responders/non-responders and selected channels.
+
+Compute ERDS differences (Oddball − Standard).
+
+Generate Figures 3 & 4: averaged ERDS plots for each condition and group.
+
+Inputs:
+
+Oddball Data/EDEN<sub>/ANALYSIS/data_clean<stage>.mat
+
+Outputs:
+
+Results/TFR_<sub>_<stage>_<condition>.fif
+
+Averaged ERDS plots per region/group
+
+Dependencies: mne, mne-connectivity, numpy, matplotlib, pandas, seaborn

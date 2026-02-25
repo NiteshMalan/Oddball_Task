@@ -48,3 +48,49 @@ Cleaned files per subject and stage:
 data_cleanimplant.mat
 
 data_cleanexplant.mat
+
+Step 3: Generate ERP Plots (Figure 2)
+
+Notebook:
+
+Notebook/Oddball_final_plots.ipynb
+
+Purpose:
+
+Load preprocessed and cleaned EEG/DBS/EMG data (data_clean*.mat).
+
+Organize data per subject, stage, and hand (affected/non-affected).
+
+Separate trials into “Oddball” vs “Standard” and “Error” vs “No Error” subsets.
+
+Compute trial-averaged ERPs per electrode or across selected electrodes.
+
+Apply moving average smoothing and compute SEM for visualization.
+
+Plot ERPs over time and topographies for responders vs non-responders.
+
+Key Steps:
+
+Define channel dictionaries for each subject and stage.
+
+Load epochs using mne.read_epochs_fieldtrip.
+
+Set EEG reference, montage, and channel types.
+
+Crop, filter, and equalize trial counts between conditions.
+
+Compute mean and SEM ERPs for selected electrodes (CP1, CP2, Cz, Pz for Pe).
+
+Plot:
+
+Time-series ERP curves with shaded error bands.
+
+Scalp topographies at defined time windows.
+
+Output:
+
+Figure 2 in the manuscript: ERP curves and topographic maps of Oddball vs Standard conditions for responders and non-responders.
+
+Dependencies:
+
+Python 3, MNE-Python, NumPy, SciPy, Matplotlib, Seaborn.

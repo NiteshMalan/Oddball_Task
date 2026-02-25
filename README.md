@@ -6,7 +6,8 @@ This repository contains the full EEG analysis pipeline for a motor oddball task
 Malan et al., 2025 – Neural mechanisms of motor and cognitive processing revealed using EEG and neural modeling.
 PubMed: https://pubmed.ncbi.nlm.nih.gov/40372092/
 
-Step 1: MATLAB Preprocessing
+**Step 1: MATLAB Preprocessing
+**
 
 Script: Matlab code/Oddball_Griptask_all_subjects.m
 
@@ -18,7 +19,8 @@ Saves clean datasets for downstream analysis.
 
 Requirements: MATLAB R2020a+, FieldTrip, EEGLAB
 
-Step 2: Clean and Standardize Data
+**Step 2: Clean and Standardize Data
+**
 
 Script: Matlab code/Data_clean_Save.m
 
@@ -33,7 +35,8 @@ Normalize hemispheres (affected hand → left).
 Input: data_eogclean_ALL*.mat
 Output: data_cleanimplant.mat, data_cleanexplant.mat
 
-Step 3: ERP Plots (Figure 2)
+**Step 3: ERP Plots (Figure 2)
+**
 
 Notebook: Notebook/Oddball_final_plots.ipynb
 
@@ -50,7 +53,8 @@ Compare responders vs non-responders.
 Output: Figure 2 – ERP curves and scalp maps.
 Dependencies: Python 3, MNE-Python, NumPy, SciPy, Matplotlib, Seaborn
 
-Step 4: Average ERDS Plots (Figures 3 & 4)
+**Step 4: Average ERDS Plots (Figures 3 & 4)
+** 
 
 Notebook: Oddball_ERDS_avg_plots.ipynb
 

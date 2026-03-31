@@ -225,8 +225,4 @@ Run the pipeline in this order:
 
 Nitesh Malan
 
----
 
-# 📜 License
-
-Specify license here (MIT recommended)
